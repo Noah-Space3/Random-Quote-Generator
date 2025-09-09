@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Random Quote Generator</title>
+  <style>
+    :root{
+      --card-bg: rgba(255,255,255,0.12);
+      --glass: rgba(255,255,255,0.08);
+      --accent: rgba(255,255,255,0.18);
+      --radius: 16px;
+      --gap: 14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{
+      height:100%;
+      margin:0;
+    }
+    /* full-screen gradient background */
+    body{
+      display:grid;
+      place-items:center;
+      background: linear-gradient(135deg,#667eea 0%, #764ba2 50%, #f6d365 100%);
+      background-attachment: fixed;
+    }
+
+    .card{
+      width:min(720px, 92%);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border-radius: var(--radius);
+      padding:28px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      backdrop-filter: blur(8px) saturate(120%);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: white;
+    }
+
+    .quote{
+      font-size:1.5rem;
+      line-height:1.45;
+      margin:0 0 12px 0;
+      min-height:4.2rem;
+      transition: transform .25s ease, opacity .25s ease;
+    }
+    .author{
+      font-size:0.95rem;
+      opacity:0.9;
+      margin-bottom:18px;
+      text-align:right;
+      font-style:italic;
+    }
+
+    .controls{
+      display:flex;
+      gap:var(--gap);
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+
+    .left-row{ display:flex; gap:10px; align-items:center; }
+
+    .btn{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.12);
+      padding:10px 14px;
+      border-radius:12px;
+      cursor:pointer;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      font-weight:600;
+      backdrop-filter: blur(4px);
+      transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+      color:inherit;
+    }
+    .btn:active{ transform: translateY(1px) scale(.997); }
+    .btn.primary{
+      background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+      border: none;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    }
+
+    .icon{ width:18px; height:18px; display:inline-block; }
+
+    .share-group{ display:flex; gap:10px; }
+
+    .small{ font-size:0.9rem; padding:8px 10px; border-radius:10px; }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:28px;
+      background: rgba(0,0,0,0.6);
+      color:white;
+      padding:10px 16px;
+      border-radius:10px;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .2s ease, transform .2s ease;
+    }
+    .toast.show{ opacity:1; transform:translateX(-50%) translateY(-6px); pointer-events:auto; }
+
+    /* responsive tweaks */
+    @media (max-width:480px){
+      .quote{ font-size:1.15rem; }
+      .controls{ gap:8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1 style="margin:0 0 8px 0; font-size:1.1rem; opacity:0.95">Random Quote Generator</h1>
+
+    <p id="quote" class="quote">"Loading quotes..."</p>
+    <p id="author" class="author">—</p>
+
+    <div class="controls">
+      <div class="left-row">
+        <button id="newQuote" class="btn primary">New Quote</button>
+        <button id="copyBtn" class="btn small" title="Copy quote">Copy</button>
+        <div class="share-group" aria-hidden="false">
+          <button id="whatsapp" class="btn" title="Share to WhatsApp">WhatsApp</button>
+          <button id="facebook" class="btn" title="Share to Facebook">Facebook</button>
+          <button id="instagram" class="btn" title="Share to Instagram">Instagram</button>
+        </div>
+      </div>
+
+      <div style="opacity:0.95; font-size:0.9rem">Click <strong>New Quote</strong> to get inspired ✨</div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied to clipboard</div>
+
+  <script>
+    // Small set of quotes (you can expand or replace with an API)
+    const QUOTES = [
+      {text: "The only limit to our realization of tomorrow is our doubts of today.", author: "Franklin D. Roosevelt"},
+      {text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein"},
+      {text: "Life is what happens when you're busy making other plans.", author: "John Lennon"},
+      {text: "Do what you can, with what you have, where you are.", author: "Theodore Roosevelt"},
+      {text: "Success is not final; failure is not fatal: It is the courage to continue that counts.", author: "Winston S. Churchill"},
+      {text: "You miss 100% of the shots you don’t take.", author: "Wayne Gretzky"},
+      {text: "The purpose of our lives is to be happy.", author: "Dalai Lama"},
+      {text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt"},
+      {text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde"},
+      {text: "Turn your wounds into wisdom.", author: "Oprah Winfrey"}
+    ];
+
+    const elQuote = document.getElementById('quote');
+    const elAuthor = document.getElementById('author');
+    const btnNew = document.getElementById('newQuote');
+    const btnCopy = document.getElementById('copyBtn');
+    const btnWA = document.getElementById('whatsapp');
+    const btnFB = document.getElementById('facebook');
+    const btnIG = document.getElementById('instagram');
+    const toast = document.getElementById('toast');
+
+    function showToast(msg = 'Copied to clipboard'){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(()=> toast.classList.remove('show'), 2200);
+    }
+
+    function pickRandom(){
+      const i = Math.floor(Math.random() * QUOTES.length);
+      return QUOTES[i];
+    }
+
+    function setQuote(obj){
+      // small animation
+      elQuote.style.opacity = 0;
+      elQuote.style.transform = 'translateY(6px)';
+      setTimeout(()=>{
+        elQuote.textContent = `"${obj.text}"`;
+        elAuthor.textContent = `— ${obj.author || 'Unknown'}`;
+        elQuote.style.opacity = 1;
+        elQuote.style.transform = 'translateY(0)';
+      }, 150);
+    }
+
+    function getCurrentText(){
+      return `${elQuote.textContent} ${elAuthor.textContent}`.trim();
+    }
+
+    // Initialize with one quote
+    document.addEventListener('DOMContentLoaded', ()=>{
+      setQuote(pickRandom());
+    });
+
+    btnNew.addEventListener('click', ()=> setQuote(pickRandom()));
+
+    btnCopy.addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(getCurrentText());
+        showToast('Quote copied to clipboard');
+      }catch(e){
+        console.error(e);
+        showToast('Could not copy (unsupported)');
+      }
+    });
+
+    btnWA.addEventListener('click', ()=>{
+      const text = encodeURIComponent(getCurrentText());
+      const url = `https://wa.me/?text=${text}`;
+      window.open(url, '_blank');
+    });
+
+    btnFB.addEventListener('click', ()=>{
+      const text = encodeURIComponent(getCurrentText());
+      // Facebook sharer likes a URL; we fallback to using example.com + query so the quote is attached as 'quote'.
+      let pageUrl = location.href && !location.href.startsWith('file:') ? location.href : 'https://example.com';
+      const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}&quote=${text}`;
+      window.open(shareUrl, '_blank');
+    });
+
+    btnIG.addEventListener('click', async ()=>{
+      // Instagram doesn't support sharing arbitrary text via web url.
+      // We copy the quote and open Instagram so the user can paste it into a post.
+      try{
+        await navigator.clipboard.writeText(getCurrentText());
+        showToast('Quote copied — open Instagram and paste it in a new post');
+        // open instagram website (mobile users can paste into app)
+        window.open('https://www.instagram.com/', '_blank');
+      }catch(e){
+        console.error(e);
+        showToast('Could not copy quote to clipboard');
+      }
+    });
+
+    // keyboard shortcut: N for new quote
+    document.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase() === 'n') btnNew.click();
+    });
+  </script>
+</body>
+</html>
